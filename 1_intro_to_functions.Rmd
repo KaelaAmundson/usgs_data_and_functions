@@ -3,6 +3,8 @@ title: "Working with USGS Data and Functions"
 author: "Matthew Ross"
 date: "10/7/2019"
 output: html_document
+editor_options: 
+  chunk_output_type: console
 ---
 
 ```{r setup, include=FALSE}
@@ -11,6 +13,7 @@ library(dataRetrieval)
 library(dygraphs) #Time series plotting
 library(tidyr) 
 library(xts) #Time series objects
+library(ggthemes)
 
 knitr::opts_chunk$set(echo = TRUE)
 ```
@@ -39,7 +42,7 @@ elc_q <- readNWISdv('06752280', parameterCd = '00060',
 
 
 combo_data <- bind_rows(lincoln_q,elc_q)
-summary(combo_data)
+#summary(combo_data)
 #summary(elc_q)
 ```
 
@@ -152,7 +155,20 @@ with a single command and a single option (which data frame to
 plot). Please plot the `combo_data` dataset here.
 
 
-```{r}
+```{r,eval=F}
+
+themes <- function(data){
+  plot1 <- ggplot(data,aes(x=q_cfs,color=site)) +
+  geom_density() +
+  scale_x_log10() +
+  theme_few() +
+  scale_color_few() +
+  theme(legend.position = c(0.9, 0.6))
+  
+  return(plot1)
+}
+
+themes(combo_data)
 
 ```
 
@@ -166,8 +182,16 @@ Even if your function call works, why is my function "brittle?"
 Hint: hardcoding `q_cfs = X_00060_00003` could be dangerous
 
 ```{r}
+#Downloading q data from the mississippi river from two locations in MN 
+
+miss_st_paul <- q_downloader(site_no = '05331000', 
+                             site_id = 'st_paul')
+
+miss_winona <- q_downloader(site_no = '05378500',
+                             site_id = 'winona')
 
 ```
+# Matt's function is 'brittle' becuase it does not allow for any flexibility within the  naming of the columns, (due to the X_ addition in the rename) which can differ via states. 
 
 
 ## Joining your two datasets
@@ -179,7 +203,20 @@ to write a function that joins your two USGS datasets by calling one of the fami
 
 Hint: be careful of having two `site` columns. 
 
-```{r}
+```{r,eval=F}
+
+joiner <- function(df1,df2,qname1,qname2){
+  df <- inner_join(df1 %>% 
+                     select(Date,q_cfs),
+                   df2 %>% 
+                     select(Date,q_cfs),by="Date") %>%
+    rename(!!qname1 := 2, #Crazy rlang::tidyeval stuff I didn't want to get into
+           !!qname2 := 3) %>% #Same
+    as_tibble()
+  return(df)
+}
+
+joined_df <- joiner(miss_st_paul,miss_winona,'st_paul_q','winona_q')
 
 ```
 
@@ -190,7 +227,18 @@ My function above `xts_maker` merely preps the data for plotting
 a dygraph. Here, I want you to make a similar function that preps *and* plots a dygraph of your joined data. 
 
 
-```{r}
+```{r, eval=F}
+
+new_xts <- function(df){
+  wide_xts <- xts(df %>%
+                  select(-Date),
+                order.by = df$Date)
+  
+  dygraph(wide_xts)
+  
+}
+
+new_xts(joined_df)
 
 ```
 
